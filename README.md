@@ -32,25 +32,25 @@
 
 2. إنشاء البيئة الوهمية وتفعيلها:
    ```bash
-python -m venv venv
+    python -m venv venv
 
 # في نظام ويندوز:
-venv\Scripts\activate
+    venv\Scripts\activate
 
 3. تثبيت المتطلبات:
    ```bash
-pip install Flask pandas openpyxl python-docx pyinstaller
+    pip install Flask pandas openpyxl python-docx pyinstaller
 
 4. تشغيل النظام:
    ```bash
-python run.py
+    python run.py
 
 سيفتح المتصفح تلقائياً على الرابط http://127.0.0.1:8000.
 
 📦 بناء النسخة التنفيذية (Building the .exe)
 لتحويل المشروع إلى ملف تنفيذي واحد لا يحتاج إلى تثبيت بايثون:
    ```bash
-pyinstaller --onedir --noconsole --icon=icon.ico --add-data "app/templates;app/templates" --add-data "app/static;app/static" --hidden-import pandas --hidden-import openpyxl --hidden-import docx run.py
+    pyinstaller --onedir --noconsole --icon=icon.ico --add-data "app/templates;app/templates" --add-data "app/static;app/static" --hidden-import pandas --hidden-import openpyxl --hidden-import docx run.py
 
 🤝 المساهمة (Contributing)
 الطلبات والمقترحات (Pull Requests) مرحب بها. للتحسينات الكبيرة، يرجى فتح Issue أولاً لمناقشة ما تود تغييره.

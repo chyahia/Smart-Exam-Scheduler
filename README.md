@@ -31,7 +31,6 @@
    cd Smart-Exam-Scheduler
 
 2. إنشاء البيئة الوهمية وتفعيلها:
-
    ```bash
 python -m venv venv
 
@@ -39,12 +38,10 @@ python -m venv venv
 venv\Scripts\activate
 
 3. تثبيت المتطلبات:
-
    ```bash
 pip install Flask pandas openpyxl python-docx pyinstaller
 
 4. تشغيل النظام:
-
    ```bash
 python run.py
 
@@ -52,12 +49,10 @@ python run.py
 
 📦 بناء النسخة التنفيذية (Building the .exe)
 لتحويل المشروع إلى ملف تنفيذي واحد لا يحتاج إلى تثبيت بايثون:
-
    ```bash
 pyinstaller --onedir --noconsole --icon=icon.ico --add-data "app/templates;app/templates" --add-data "app/static;app/static" --hidden-import pandas --hidden-import openpyxl --hidden-import docx run.py
 
 🤝 المساهمة (Contributing)
-
 الطلبات والمقترحات (Pull Requests) مرحب بها. للتحسينات الكبيرة، يرجى فتح Issue أولاً لمناقشة ما تود تغييره.
 
 تم تطوير هذا المشروع لتسهيل الإدارة الأكاديمية.

@@ -49,7 +49,7 @@
 
 📦 بناء النسخة التنفيذية (Building the .exe)
 لتحويل المشروع إلى ملف تنفيذي واحد لا يحتاج إلى تثبيت بايثون:
-   ```bash
+    ```bash
     pyinstaller --onedir --noconsole --icon=icon.ico --add-data "app/templates;app/templates" --add-data "app/static;app/static" --hidden-import pandas --hidden-import openpyxl --hidden-import docx run.py
 
 🤝 المساهمة (Contributing)

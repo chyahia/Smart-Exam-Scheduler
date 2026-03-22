@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>موزع حراسة الامتحانات الذكي</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <main>
+        <!-- 🌟 أضف هذا الغلاف الذي سيجمع الهيدر والتبويبات ويثبتهما معاً 🌟 -->
+        <!-- 🌟 الغلاف الثابت المدمج (بدون فراغات) 🌟 -->
+        <div style="position: sticky; top: 0; z-index: 1000; margin: -20px -40px 20px -40px; background-color: #3f51b5; border-radius: 8px 8px 0 0; box-shadow: 0 4px 8px rgba(0,0,0,0.2);">
+            
+            <header class="app-header" style="display: flex; justify-content: space-between; align-items: center; min-height: 60px; padding: 15px 40px; border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 0;">
+                
+                <!-- العنوان -->
+                <div class="header-title" style="display: flex; align-items: center;">
+                    
+                    <!-- الشعار أولاً (في أقصى اليمين) -->
+                    <img src="{{ url_for('static', filename='images/chy_logo.png') }}" 
+                         alt="شعار المؤسسة" 
+                         style="height: 45px; margin-left: 15px; width: auto; object-fit: contain;">
+                    
+                    <!-- ثم العنوان والأيقونة -->
+                    <h1 style="margin: 0; font-size: 24px; color: #ffffff; border-bottom: none; padding-bottom: 0;">🎓 موزع حراسة الامتحانات الذكي</h1>
+                    
+                </div>
+
+                <!-- الأزرار -->
+                <div class="header-buttons" style="margin: 0;">
+                    <button id="save-settings-btn" class="header-btn" style="background-color: #28a745; color: white; border: none;">💾 حفظ الإعدادات</button>
+                    <button id="shutdown-btn" class="header-btn" style="background-color: #dc3545; color: white; border: none;">🛑 إيقاف الخادم</button>
+                    <button id="about-button" class="header-btn" style="background-color: rgba(255,255,255,0.2); color: white; border: 1px solid white;">عن البرنامج</button>
+                    <button id="help-button" class="header-btn" style="background-color: rgba(255,255,255,0.2); color: white; border: 1px solid white;">المساعدة</button>
+                </div>
+                
+            </header>
+
+            <!-- التبويبات مدمجة مباشرة تحت الهيدر -->
+            <div class="tabs-container" style="margin-bottom: 0; border-radius: 0; box-shadow: none; background-color: transparent;">
+                <button class="tab-link active" onclick="openTab(event, 'tab1')">المرحلة 1: البيانات الأساسية</button>
+                <button class="tab-link" onclick="openTab(event, 'tab2')">المرحلة 2: إدارة البيانات</button>
+                <button class="tab-link" onclick="openTab(event, 'tab3')">المرحلة 3: الإسناد والقاعات</button>
+                <button class="tab-link" onclick="openTab(event, 'tab4')">المرحلة 4: الأيام والأوقات</button>
+                <button class="tab-link" onclick="openTab(event, 'tab5')">المرحلة 5: القيود والشروط</button>
+                <button class="tab-link" onclick="openTab(event, 'tab6')">المرحلة 6: التوليد والتصدير</button>
+                <button class="tab-link" onclick="openTab(event, 'tab7')">المرحلة 7: النسخ الاحتياطي</button>
+            </div>
+            
+        </div> <!-- 🌟 نهاية الغلاف الثابت 🌟 -->
+
+        <div class="content-container">
+            {% block content %}{% endblock %}
+        </div>
+    </main>
+
+    <!-- 🌟 النافذة المنبثقة المخصصة (Modal) 🌟 -->
+    <div id="custom-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modal-title" style="margin: 0; color: #3f51b5;">العنوان</h3>
+                <button class="close-modal-btn" onclick="closeCustomModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="modal-body">
+                <!-- سيتم حقن المحتوى هنا عبر الجافاسكربت -->
+            </div>
+        </div>
+    </div>
+
+    <div id="notification-area"></div>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/basic_data.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/manage_data.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/assignments.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/times.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/conditions.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/generation.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/system.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/chart.min.js') }}"></script>
+</body>
+</html>

@@ -1,0 +1,208 @@
+document.addEventListener('DOMContentLoaded', async () => {
+    // --- 1. جلب إعدادات الخوارزمية وعرضها في الحقول عند تحديث الصفحة ---
+    try {
+        const res = await fetch('/api/settings');
+        if (res.ok) {
+             const settings = await res.json();
+             // تعبئة حقول الخوارزميات إذا كانت موجودة في قاعدة البيانات
+             if (settings.algorithm) document.getElementById('algorithm-select').value = settings.algorithm;
+             if (settings.unifiedIter) document.getElementById('unified-iter').value = settings.unifiedIter;
+             if (settings.unifiedDestroy) document.getElementById('unified-destroy').value = settings.unifiedDestroy;
+             if (settings.lnsIter) document.getElementById('lns-iter').value = settings.lnsIter;
+             if (settings.lnsDestroy) document.getElementById('lns-destroy').value = settings.lnsDestroy;
+             if (settings.vnsIter) document.getElementById('vns-iter').value = settings.vnsIter;
+             if (settings.vnsK) document.getElementById('vns-k').value = settings.vnsK;
+             if (settings.tabuIter) document.getElementById('tabu-iter').value = settings.tabuIter;
+             if (settings.tabuSize) document.getElementById('tabu-size').value = settings.tabuSize;
+             if (settings.tabuTenure) document.getElementById('tabu-tenure').value = settings.tabuTenure;
+        }
+    } catch (e) {
+        console.error('لم يتم العثور على إعدادات محفوظة مسبقاً للخوارزميات:', e);
+    }
+
+    // --- 2. أزرار النسخ الاحتياطي والاستعادة ---
+    const backupBtn = document.getElementById('backup-btn');
+    const restoreBtn = document.getElementById('restore-btn');
+    const fileInput = document.getElementById('restore-file-input');
+    const resetBtn = document.getElementById('reset-all-btn');
+
+    if(backupBtn) {
+        backupBtn.addEventListener('click', async () => {
+            try {
+                const response = await fetch('/api/backup');
+                if (!response.ok) throw new Error('فشل النسخ الاحتياطي');
+                
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `ExamGuard_Backup_${new Date().toISOString().slice(0, 10)}.json`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                a.remove();
+                showNotification('تم تحميل النسخة الاحتياطية بنجاح.', 'success');
+            } catch (error) { showNotification('حدث خطأ أثناء تصدير النسخة.', 'error'); }
+        });
+    }
+
+    if(restoreBtn) restoreBtn.addEventListener('click', () => fileInput.click());
+
+    if(fileInput) {
+        fileInput.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+            if (!confirm("هل أنت متأكد؟ سيتم مسح البيانات الحالية واستبدالها ببيانات الملف.")) {
+                fileInput.value = ''; return;
+            }
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    fetch('/api/restore', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })
+                    .then(res => res.json()).then(res => {
+                        if(res.success) { alert(res.message); location.reload(); }
+                        else showNotification(res.error, 'error');
+                    });
+                } catch (error) { showNotification('ملف غير صالح.', 'error'); }
+            };
+            reader.readAsText(file);
+        });
+    }
+
+    if(resetBtn) {
+        resetBtn.addEventListener('click', () => {
+            if (confirm("تحذير! هل أنت متأكد من مسح جميع البيانات والإعدادات نهائياً؟")) {
+                fetch('/api/reset-all', { method: 'POST' }).then(res => res.json()).then(res => {
+                    if(res.success) { alert(res.message); location.reload(); }
+                });
+            }
+        });
+    }
+
+    // --- 3. زر حفظ الإعدادات الشامل (Global Save) ---
+    const saveSettingsBtn = document.getElementById('save-settings-btn');
+    if (saveSettingsBtn) {
+        saveSettingsBtn.addEventListener('click', async () => {
+            saveSettingsBtn.textContent = '⏳ جاري الحفظ الشامل...';
+            
+            try {
+                // الخطوة 1: حفظ المرحلة 5 بانتظار (await) لضمان دمجها في قاعدة البيانات أولاً
+                if (typeof saveAllConditions === 'function') {
+                    // نمرر false كي لا يظهر إشعار الحفظ الخاص بالمرحلة 5 (نكتفي بالإشعار الشامل)
+                    await saveAllConditions(false); 
+                }
+
+                // الخطوة 2: جلب قاعدة البيانات (والتي تحتوي الآن على إعدادات المرحلة 5 بأمان)
+                const res = await fetch('/api/settings');
+                let currentSettings = await res.json();
+
+                // الخطوة 3: دمج إعدادات الخوارزميات (المرحلة 6) معها
+                currentSettings.algorithm = document.getElementById('algorithm-select')?.value;
+                currentSettings.unifiedIter = document.getElementById('unified-iter')?.value;
+                currentSettings.unifiedDestroy = document.getElementById('unified-destroy')?.value;
+                currentSettings.lnsIter = document.getElementById('lns-iter')?.value;
+                currentSettings.lnsDestroy = document.getElementById('lns-destroy')?.value;
+                currentSettings.vnsIter = document.getElementById('vns-iter')?.value;
+                currentSettings.vnsK = document.getElementById('vns-k')?.value;
+                currentSettings.tabuIter = document.getElementById('tabu-iter')?.value;
+                currentSettings.tabuSize = document.getElementById('tabu-size')?.value;
+                currentSettings.tabuTenure = document.getElementById('tabu-tenure')?.value;
+
+                // الخطوة 4: حفظ البيانات النهائية المكتملة
+                await fetch('/api/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(currentSettings)
+                });
+
+                // الخطوة 5: حفظ المرحلة 3 و 4 (هذه المراحل لها مساراتها المستقلة في السيرفر ولا تتضارب)
+                if (typeof saveBulkLevelHalls === 'function') saveBulkLevelHalls();
+                if (typeof saveExamSchedule === 'function') saveExamSchedule();
+
+                // إشعار نجاح مجمع
+                setTimeout(() => {
+                    showNotification('تم حفظ جميع البيانات والإعدادات في كافة المراحل بنجاح! 💾', 'success');
+                }, 500);
+                
+            } catch (e) {
+                console.error(e);
+                showNotification('حدث خطأ أثناء الحفظ الشامل.', 'error');
+            } finally {
+                saveSettingsBtn.textContent = '💾 حفظ الإعدادات';
+            }
+        });
+    }
+
+    // --- 4. زر إيقاف الخادم ---
+    const shutdownBtn = document.getElementById('shutdown-btn');
+    if (shutdownBtn) {
+        shutdownBtn.addEventListener('click', async () => {
+            if (confirm("⚠️ هل أنت متأكد أنك تريد إيقاف الخادم؟\nلن تتمكن من استخدام البرنامج حتى تعيد تشغيله من جديد.")) {
+                try {
+                    await fetch('/api/shutdown', { method: 'POST' });
+                    alert("تم إرسال أمر الإيقاف. يمكنك الآن إغلاق هذه النافذة (المتصفح) بأمان.");
+                    window.close(); 
+                } catch (error) {
+                    console.log("تم إيقاف الخادم.");
+                }
+            }
+        });
+    }
+
+    // ==========================================
+    // --- 5. أزرار المساعدة والنافذة المنبثقة ---
+    // ==========================================
+    
+    window.openCustomModal = function(title, contentHTML) {
+        document.getElementById('modal-title').innerHTML = title;
+        document.getElementById('modal-body').innerHTML = contentHTML;
+        document.getElementById('custom-modal').style.display = 'flex';
+    };
+
+    window.closeCustomModal = function() {
+        document.getElementById('custom-modal').style.display = 'none';
+    };
+
+    // إغلاق النافذة عند النقر خارجها (على الخلفية المظلمة)
+    window.addEventListener('click', function(event) {
+        const modal = document.getElementById('custom-modal');
+        if (event.target === modal) {
+            closeCustomModal();
+        }
+    });
+
+    document.getElementById('about-button')?.addEventListener('click', () => {
+        const aboutContent = `
+            <div style="text-align: center; padding: 10px;">
+                <h2 style="color: #3f51b5; margin-bottom: 5px; margin-top: 0;">🎓 موزع حراسة الامتحانات الذكي</h2>
+                <p style="color: #666; margin-top: 0; font-size: 14px;">(Smart Exam Invigilation Scheduler)</p>
+                <span style="display: inline-block; background: #e8f5e9; color: #2e7d32; padding: 5px 15px; border-radius: 20px; font-weight: bold; margin: 10px 0;">الإصدار 1.0</span>
+                <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
+                <p style="font-size: 16px; margin-bottom: 5px;">تم تصميم وتطوير هذا النظام بواسطة:</p>
+                <h3 style="color: #d32f2f; margin: 0;">الدكتور شعيب يحيى</h3>
+                <p style="color: #888; font-size: 13px; margin-top: 25px; margin-bottom: 0;">جميع الحقوق محفوظة © 2026</p>
+            </div>
+        `;
+        openCustomModal('ℹ️ عن البرنامج', aboutContent);
+    });
+
+    document.getElementById('help-button')?.addEventListener('click', () => {
+        const helpContent = `
+            <p style="font-weight: bold; color: #3f51b5; margin-top: 0;">💡 دليل استخدام النظام - مراحل العمل:</p>
+            <ul style="padding-right: 20px; margin-bottom: 20px; list-style-type: none;">
+                <li style="margin-bottom: 12px;"><b>1️⃣ المرحلة 1 (البيانات الأساسية):</b> إدخال قوائم الأساتذة، القاعات، المستويات، والمواد.</li>
+                <li style="margin-bottom: 12px;"><b>2️⃣ المرحلة 2 (إدارة البيانات):</b> مراجعة، تعديل، أو حذف البيانات التي تم إدخالها.</li>
+                <li style="margin-bottom: 12px;"><b>3️⃣ المرحلة 3 (الإسناد والقاعات):</b> إسناد المواد لأساتذتها، وتحديد القاعات المخصصة لكل مستوى.</li>
+                <li style="margin-bottom: 12px;"><b>4️⃣ المرحلة 4 (الأيام والأوقات):</b> بناء الهيكل الزمني وتحديد أيام وفترات الامتحانات.</li>
+                <li style="margin-bottom: 12px;"><b>5️⃣ المرحلة 5 (القيود والشروط):</b> ضبط غيابات الأساتذة، أنماط العمل، التنافر، والحدود القصوى.</li>
+                <li style="margin-bottom: 12px;"><b>6️⃣ المرحلة 6 (التوليد والتصدير):</b> تشغيل الخوارزميات الذكية لإنشاء جداول الحراسة وتصديرها.</li>
+                <li style="margin-bottom: 12px;"><b>7️⃣ المرحلة 7 (النسخ الاحتياطي):</b> أخذ نسخة احتياطية من جميع البيانات أو استعادتها.</li>
+            </ul>
+            <div style="background: #fff3cd; color: #856404; padding: 12px; border-radius: 5px; border: 1px solid #ffeeba; font-size: 14px;">
+                <b>⚠️ تلميح هام:</b> تأكد من حفظ إعدادات كل مرحلة (عبر زر الحفظ الأخضر) قبل الانتقال للمرحلة التي تليها!
+            </div>
+        `;
+        openCustomModal('❓ مساعدة ودليل الاستخدام', helpContent);
+    });
+});

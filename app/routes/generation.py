@@ -278,6 +278,20 @@ def _background_generation(algorithm_choices, algo_params):
 
         if best_schedule:
             log_queue.put("\n✓ انتهت سلسلة الخوارزميات بالكامل. جاري حساب الإحصائيات النهائية...")
+
+            # --- 🌟 تشغيل فريق الطوارئ لسد النقص المتبقي 🌟 ---
+            from app.services.algorithms import desperation_repair_pass, calculate_cost, format_cost_tuple
+            
+            log_queue.put(">>> جاري تفعيل فريق الطوارئ (جبر النقص الأخير)...")
+            
+            # 1. تنفيذ جبر النقص
+            best_schedule = desperation_repair_pass(best_schedule, main_settings, all_professors, duty_patterns, date_map)
+            
+            # 2. حساب التكلفة الجديدة بعد الإصلاح
+            final_cost = calculate_cost(best_schedule, main_settings, all_professors, duty_patterns, date_map)
+            
+            # 3. طباعة النتيجة النهائية للشاشة السوداء
+            log_queue.put(f"✓ اكتمل جبر النقص. النتيجة النهائية: {format_cost_tuple(final_cost)}")
             
             # --- حساب الإحصائيات للوحة المعلومات ---
             all_exams_flat = [exam for day in best_schedule.values() for slot in day.values() for exam in slot]
@@ -390,6 +404,7 @@ def _background_generation(algorithm_choices, algo_params):
                 chart_data['datasets'][1]['data'].append(prof_stats[prof_name]['large'])
 
             # --- تجميع كل البيانات في القاموس النهائي ---
+            # --- تجميع كل البيانات في القاموس النهائي ---
             stats_dashboard = {
                 'total_large_duties': total_large,
                 'total_other_duties': total_other,
@@ -399,15 +414,22 @@ def _background_generation(algorithm_choices, algo_params):
                 'least_burdened_profs': [{'name': p[0], 'workload': round(p[1], 2)} for p in sorted_profs[:3]],
                 'most_burdened_profs': [{'name': p[0], 'workload': round(p[1], 2)} for p in sorted_profs[-3:]][::-1],
                 'shortage_reports': shortage_reports,
-                
-                # 👇 دمج البيانات الجديدة هنا 👇
                 'unscheduled_subjects_report': unscheduled_subjects,
                 'chart_data': chart_data,
                 'balance_report_data': balance_report_data 
             }
 
-            # إرسال الجدول والإحصائيات معاً للواجهة
-            result_json = json.dumps({"success": True, "schedule": best_schedule, "stats": stats_dashboard})
+            # 👇 توليد تقرير الأخطاء والملاحظات 👇
+            from app.services.algorithms import generate_violation_report
+            violations_report = generate_violation_report(best_schedule, main_settings, all_professors)
+
+            # إرسال الجدول، الإحصائيات، والتقرير معاً للواجهة
+            result_json = json.dumps({
+                "success": True, 
+                "schedule": best_schedule, 
+                "stats": stats_dashboard,
+                "violations": violations_report  # 👈 إضافة التقرير هنا
+            })
             log_queue.put(f"DONE:{result_json}")
         else:
             log_queue.put("DONE:{\"success\": false, \"message\": \"فشل إيجاد حل أو تم الإيقاف.\"}")

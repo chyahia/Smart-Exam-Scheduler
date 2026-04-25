@@ -461,6 +461,20 @@
             <div style="background: #000; color: #0f0; font-family: monospace; padding: 15px; border-radius: 5px; height: 300px; overflow-y: auto; direction: rtl; text-align: center; line-height: 1.8; font-size: 16px; font-weight: bold;" id="live-log-box">
 [System Ready] قم بضبط الإعدادات واضغط بدء التوليد...
             </div>
+
+            <div id="violation-report-container" style="display: none; margin-top: 20px; border: 1px solid #ddd; border-radius: 5px; background: #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+                <h3 style="margin: 0; padding: 10px 15px; background: #f8f9fa; border-bottom: 1px solid #ddd; font-size: 16px; color: #333;">📊 تقرير الأخطاء والملاحظات بعد التوليد</h3>
+                <div style="padding: 15px; display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px;">
+                    <div style="background: #ffebee; border: 1px solid #ffcdd2; border-radius: 5px; padding: 10px;">
+                        <h4 style="color: #c62828; margin-top: 0; margin-bottom: 10px; font-size: 14px;">🔴 أخطاء صارمة ونقص (يجب الانتباه لها)</h4>
+                        <ul id="strict-errors-list" style="margin: 0; padding-right: 20px; font-size: 14px; color: #b71c1c; line-height: 1.6;"></ul>
+                    </div>
+                    <div style="background: #fff8e1; border: 1px solid #ffecb3; border-radius: 5px; padding: 10px;">
+                        <h4 style="color: #f57f17; margin-top: 0; margin-bottom: 10px; font-size: 14px;">🟠 ملاحظات مرنة (تجاوزات إدارية)</h4>
+                        <ul id="soft-warnings-list" style="margin: 0; padding-right: 20px; font-size: 14px; color: #e65100; line-height: 1.6;"></ul>
+                    </div>
+                </div>
+            </div>
             
             <div id="generation-results-area" style="margin-top: 30px; display: none;">
                 
@@ -520,7 +534,7 @@
 
             <hr style="margin: 40px 0; border: 1px solid #eee;">
 
-            <h3 style="color: #dc3545;">⚠️ منطقة الخطر</h3>
+            <h3 style="color: #dc3545;">⚠️ منطقة الحذر</h3>
             <button id="reset-all-btn" style="background: #dc3545; color: white; border: none; padding: 10px 20px; border-radius: 5px; font-weight: bold; cursor: pointer;">🗑️ مسح جميع بيانات النظام نهائياً</button>
         </div>
     </div>

@@ -74,6 +74,39 @@ function startGeneration() {
                             displayWorkloadChart(data.stats.chart_data);
                         }
                         renderScheduleTables(data.schedule); // 🌟 رسم الجدول
+                        
+                        // --- 👇 إضافة: عرض تقرير الأخطاء والملاحظات 👇 ---
+                        if (data.violations) {
+                            const repContainer = document.getElementById('violation-report-container');
+                            const strictList = document.getElementById('strict-errors-list');
+                            const softList = document.getElementById('soft-warnings-list');
+                            
+                            if (repContainer && strictList && softList) {
+                                strictList.innerHTML = '';
+                                softList.innerHTML = '';
+
+                                // تعبئة الأخطاء الصارمة
+                                if (data.violations.strict.length === 0) {
+                                    strictList.innerHTML = '<li>✅ ممتاز! لا توجد أي أخطاء صارمة أو نقص في الحراس. الجدول سليم أساسياً.</li>';
+                                } else {
+                                    data.violations.strict.forEach(err => {
+                                        strictList.innerHTML += `<li style="margin-bottom: 5px;">${err}</li>`;
+                                    });
+                                }
+
+                                // تعبئة الملاحظات المرنة
+                                if (data.violations.soft.length === 0) {
+                                    softList.innerHTML = '<li>✅ رائع! جميع القيود المرنة والحدود القصوى محترمة 100%.</li>';
+                                } else {
+                                    data.violations.soft.forEach(warn => {
+                                        softList.innerHTML += `<li style="margin-bottom: 5px;">${warn}</li>`;
+                                    });
+                                }
+                                
+                                repContainer.style.display = 'block';
+                            }
+                        }
+                        // --- 👆 نهاية إضافة التقرير 👆 ---
                     } else {
                         logBox.innerHTML += `<br><span style="color:red;">[Error] ${data.message}</span><br>`;
                     }

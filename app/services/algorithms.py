@@ -12,38 +12,51 @@ from collections import defaultdict, Counter, deque
 def is_assignment_valid(prof, exam, prof_assignments, prof_large_counts, settings, date_map):
     duty_patterns = settings.get('dutyPatterns', {})
     unavailable_days = settings.get('unavailableDays', {})
-    max_shifts = int(settings.get('maxShifts', '0')) if settings.get('maxShifts', '0') != '0' else float('inf')
-    max_large_hall_shifts = int(settings.get('maxLargeHallShifts', '2')) if settings.get('maxLargeHallShifts', '2') != '0' else float('inf')
+    prof_clean = prof.strip()
+
+    # 1. 🔴 المستحيلات المطلقة (تعارض، غياب، تنافر)
+    if any(e['date'] == exam['date'] and e['time'] == exam['time'] for e in prof_assignments.get(prof_clean, [])): return False
+    if exam['date'] in unavailable_days.get(prof_clean, []): return False
     
-    if any(e['date'] == exam['date'] and e['time'] == exam['time'] for e in prof_assignments.get(prof, [])): return False
-    if exam['date'] in unavailable_days.get(prof, []): return False
-    if len(prof_assignments.get(prof, [])) >= max_shifts: return False
-
-    is_large_hall_exam = any(h['type'] == 'كبيرة' for h in exam['halls'])
-    if is_large_hall_exam and prof_large_counts.get(prof, 0) >= max_large_hall_shifts: return False
-
-    prof_pattern = duty_patterns.get(prof, 'flexible_2_days')
-    duties_dates = {d['date'] for d in prof_assignments.get(prof, [])}
-    is_new_day = exam['date'] not in duties_dates
-    num_duty_days = len(duties_dates)
-
-    if is_new_day:
-        if (prof_pattern == 'one_day_only' and num_duty_days >= 1) or \
-           (prof_pattern == 'flexible_2_days' and num_duty_days >= 2) or \
-           (prof_pattern == 'flexible_3_days' and num_duty_days >= 3) or \
-           (prof_pattern == 'consecutive_strict' and num_duty_days >= 2):
-            return False
-        elif prof_pattern == 'consecutive_strict' and num_duty_days == 1:
-            idx1 = date_map.get(list(duties_dates)[0])
-            idx2 = date_map.get(exam['date'])
-            if idx1 is None or idx2 is None or abs(idx1 - idx2) != 1: return False
-
-    # ✨ قيد التنافر (عدم التشارك) الجديد
     exclusive_profs = settings.get('exclusiveProfessors', [])
     for pair in exclusive_profs:
-        if prof == pair[0] and any(e['date'] == exam['date'] for e in prof_assignments.get(pair[1], [])): return False
-        if prof == pair[1] and any(e['date'] == exam['date'] for e in prof_assignments.get(pair[0], [])): return False
+        if prof_clean == pair[0].strip() and any(e['date'] == exam['date'] for e in prof_assignments.get(pair[1].strip(), [])): return False
+        if prof_clean == pair[1].strip() and any(e['date'] == exam['date'] for e in prof_assignments.get(pair[0].strip(), [])): return False
 
+    # 2. 🟠 القيود الإدارية الصارمة (لا تُكسر أبداً في هذه المرحلة)
+    
+    # أ. فحص سقف الحراسات
+    max_shifts = int(settings.get('maxShifts', '0')) if settings.get('maxShifts', '0') != '0' else float('inf')
+    if len(prof_assignments.get(prof_clean, [])) >= max_shifts: return False
+
+    # ب. الإصلاح الدقيق للقاعات الكبيرة
+    guards_large_hall_setting = int(settings.get('guardsLargeHall', 4))
+    large_guards_needed = sum(guards_large_hall_setting for h in exam.get('halls', []) if h.get('type') == 'كبيرة')
+    current_guards_count = len([g for g in exam.get('guards', []) if g != "**نقص**"])
+    
+    is_large_hall_position = current_guards_count < large_guards_needed
+    max_large_hall_shifts = int(settings.get('maxLargeHallShifts', '2')) if settings.get('maxLargeHallShifts', '2') != '0' else float('inf')
+    
+    if is_large_hall_position and prof_large_counts.get(prof_clean, 0) >= max_large_hall_shifts: return False
+
+    # ج. فحص الأنماط (مع استثناء unlimited)
+    prof_pattern = duty_patterns.get(prof_clean, 'flexible_2_days')
+    if prof_pattern != 'unlimited':
+        duties_dates = {d['date'] for d in prof_assignments.get(prof_clean, [])}
+        is_new_day = exam['date'] not in duties_dates
+        num_duty_days = len(duties_dates)
+
+        if is_new_day:
+            if (prof_pattern == 'one_day_only' and num_duty_days >= 1) or \
+               (prof_pattern == 'flexible_2_days' and num_duty_days >= 2) or \
+               (prof_pattern == 'flexible_3_days' and num_duty_days >= 3) or \
+               (prof_pattern == 'consecutive_strict' and num_duty_days >= 2):
+                return False
+            elif prof_pattern == 'consecutive_strict' and num_duty_days == 1:
+                idx1 = date_map.get(list(duties_dates)[0])
+                idx2 = date_map.get(exam['date'])
+                if idx1 is None or idx2 is None or abs(idx1 - idx2) != 1: return False
+                
     return True
 
 def is_schedule_valid(schedule, settings, all_professors, duty_patterns, date_map):
@@ -102,31 +115,26 @@ def is_schedule_valid(schedule, settings, all_professors, duty_patterns, date_ma
     return True
 
 def calculate_cost(schedule, settings, all_professors, duty_patterns, date_map):
+    from collections import Counter
+    
     all_exams_flat = [exam for day in schedule.values() for slot in day.values() for exam in slot]
     shortage_component = sum(e.get('guards', []).count("**نقص**") for e in all_exams_flat)
-    hard_constraint_component = 1 if not is_schedule_valid(schedule, settings, all_professors, duty_patterns, date_map) else 0
-    soft_constraint_component = 0
-    prof_subject_days = defaultdict(set)
-    prof_guards_days = defaultdict(set)
-    for exam in all_exams_flat:
-        owner = exam.get('professor', "غير محدد")
-        if owner != "غير محدد": prof_subject_days[owner].add(exam['date'])
-        for guard in exam.get('guards', []):
-            if guard != "**نقص**": prof_guards_days[guard].add(exam['date'])
-
-    for prof in all_professors:
-        missed_opportunity_days = len(prof_subject_days.get(prof, set()) - prof_guards_days.get(prof, set()))
-        soft_constraint_component += missed_opportunity_days * 10
-    for prof, days in prof_subject_days.items():
-        if len(days) > 2: soft_constraint_component += (len(days) - 2) * 5
+    
+    # 🌟 الاستدعاء المباشر لدالة التقرير لضمان التطابق التام 100% 🌟
+    violation_report = generate_violation_report(schedule, settings, all_professors)
+    hard_constraint_component = len(violation_report["strict"])
+    soft_constraint_component = len(violation_report["soft"]) * 10 # كل ملاحظة مرنة نعتبرها بـ 10 نقاط
 
     deviation_component = 0.0
     large_hall_weight = float(settings.get('largeHallWeight', 3.0))
     prof_stats = {prof: {'large': 0, 'other': 0} for prof in all_professors}
     guards_large_hall = int(settings.get('guardsLargeHall', 4))
+    
     for exam in all_exams_flat:
-        guards_copy = [g for g in exam.get('guards', []) if g != "**نقص**"]
+        # إضافة strip لإزالة أي مسافات مخفية قد تسبب مشاكل في الحساب
+        guards_copy = [g.strip() for g in exam.get('guards', []) if g != "**نقص**"] 
         large_guards_needed = sum(guards_large_hall for h in exam.get('halls', []) if h.get('type') == 'كبيرة')
+        
         for guard in guards_copy[:large_guards_needed]:
             if guard in prof_stats: prof_stats[guard]['large'] += 1
         for guard in guards_copy[large_guards_needed:]:
@@ -1147,3 +1155,239 @@ def run_tabu_search(initial_schedule, settings, all_professors, duty_patterns, d
     final_cost = calculate_cost(best_solution_so_far, settings, all_professors, duty_patterns, date_map)
     log_q.put(f"✓ البحث المحظور انتهى بأفضل تكلفة: {format_cost_tuple(final_cost)}")
     return best_solution_so_far, None, None, None
+
+
+# ===================================================================
+# 10. دالة توليد تقرير الأخطاء والملاحظات (الإصدار الشامل لجميع القيود)
+# ===================================================================
+def generate_violation_report(schedule, settings, all_professors):
+    """تحليل شامل ودقيق لجميع قيود الجدول (الصارمة والمرنة)"""
+    strict_errors = []
+    soft_warnings = []
+    from collections import defaultdict
+
+    # مخازن البيانات للإحصاء
+    prof_proctor_days = defaultdict(set)   # الأيام التي يحرس فيها الأستاذ فعلياً
+    prof_subject_days = defaultdict(set)   # الأيام التي تقع فيها مواد الأستاذ
+    prof_shift_counts = defaultdict(int)   # إجمالي عدد الحراسات
+    prof_large_counts = defaultdict(int)   # عدد الحراسات في قاعات كبيرة
+
+    # جلب الإعدادات والقيود
+    professor_pairs = settings.get('professorPartnerships', [])
+    exclusive_profs = settings.get('exclusiveProfessors', [])
+    unavailable_days = settings.get('unavailableDays', {})
+    duty_patterns = settings.get('dutyPatterns', {})
+    
+    max_shifts = int(settings.get('maxShifts', '0')) if settings.get('maxShifts', '0') != '0' else float('inf')
+    max_large_hall_shifts = int(settings.get('maxLargeHallShifts', '2')) if settings.get('maxLargeHallShifts', '2') != '0' else float('inf')
+    guards_per_large_hall = int(settings.get('guardsLargeHall', 4))
+
+    # خريطة الأيام لحساب التتالي
+    sorted_dates = sorted(schedule.keys())
+    date_map = {date: i for i, date in enumerate(sorted_dates)}
+
+    # 1. المسح الشامل للجدول لجمع الإحصائيات
+    for day, slots in schedule.items():
+        for time_slot, exams in slots.items():
+            slot_profs = set() # لمنع تكرار الأستاذ في نفس الفترة
+            for exam in exams:
+                subject_owner = exam.get('professor', 'غير محدد').strip()
+                subject_name = exam.get('subject', 'مادة غير معروفة')
+                
+                # حساب عدد الحراس المطلوبين للقاعات الكبيرة في هذا الامتحان
+                num_large_halls = len([h for h in exam.get('halls', []) if h.get('type') == 'كبيرة'])
+                large_slots_needed = num_large_halls * guards_per_large_hall
+                
+                # تسجيل يوم المادة لصاحب المادة
+                if subject_owner and subject_owner != "غير محدد":
+                    prof_subject_days[subject_owner].add(day)
+
+                # فحص الحراس
+                for idx, guard in enumerate(exam.get('guards', [])):
+                    if guard == "**نقص**":
+                        strict_errors.append(f"🔴 نقص: يوم {day} ({time_slot}) لمادة {subject_name}.")
+                        continue
+                    
+                    guard_clean = guard.strip()
+                    prof_proctor_days[guard_clean].add(day)
+                    prof_shift_counts[guard_clean] += 1
+                    
+                    # 🌟 تصحيح القاعات الكبيرة: يُحسب فقط إذا كان ترتيب الحارس ضمن حصة القاعة الكبيرة
+                    if idx < large_slots_needed:
+                        prof_large_counts[guard_clean] += 1
+
+                    # فحص التعارض الزمني
+                    if guard_clean in slot_profs:
+                        strict_errors.append(f"🔴 تعارض زمني: الأستاذ [{guard_clean}] يحرس في أكثر من مكان يوم {day} ({time_slot}).")
+                    slot_profs.add(guard_clean)
+
+                    # فحص الأيام غير المتاحة
+                    if day in unavailable_days.get(guard_clean, []):
+                        strict_errors.append(f"🔴 مخالفة توفر: الأستاذ [{guard_clean}] كُلف بالحراسة يوم {day} وهو غير متاح.")
+
+    # 2. فحص سقف الحراسات (إجمالي وقاعات كبيرة)
+    for prof in all_professors:
+        p_name = prof.strip()
+        if prof_shift_counts[p_name] > max_shifts:
+            strict_errors.append(f"🔴 تجاوز الحد الأقصى: الأستاذ [{p_name}] يحرس {prof_shift_counts[p_name]} فترات (الحد: {max_shifts}).")
+        
+        if prof_large_counts[p_name] > max_large_hall_shifts:
+            strict_errors.append(f"🔴 تجاوز القاعات الكبيرة: الأستاذ [{p_name}] يحرس {prof_large_counts[p_name]} مرات في قاعة كبيرة (الحد: {max_large_hall_shifts}).")
+
+    # 3. فحص أنماط الدوام (تجاهل نمط unlimited)
+    for prof, pattern in duty_patterns.items():
+        if pattern == 'unlimited' or not prof_proctor_days.get(prof): continue
+        
+        indices = sorted(list({date_map[d] for d in prof_proctor_days[prof] if d in date_map}))
+        num_days = len(indices)
+
+        if pattern == 'one_day_only' and num_days > 1:
+            strict_errors.append(f"🔴 مخالفة نمط (يوم واحد فقط): الأستاذ [{prof}] يحرس في {num_days} أيام.")
+        elif pattern == 'flexible_2_days' and num_days != 2:
+            strict_errors.append(f"🔴 مخالفة نمط (يومان مرنان): الأستاذ [{prof}] يحرس في {num_days} أيام (المطلوب 2).")
+        elif pattern == 'consecutive_strict':
+            if num_days != 2 or (len(indices) > 1 and indices[1] - indices[0] != 1):
+                strict_errors.append(f"🔴 مخالفة نمط (يومان متتاليان): الأستاذ [{prof}] لم يحقق شرط التتالي حصراً.")
+        elif pattern == 'flexible_3_days' and (num_days < 2 or num_days > 3):
+            strict_errors.append(f"🔴 مخالفة نمط (2-3 أيام مرنة): الأستاذ [{prof}] يحرس في {num_days} أيام.")
+
+    # 4. فحص الارتباط والتنافر
+    for p1, p2 in [ (str(pair[0]).strip(), str(pair[1]).strip()) for pair in professor_pairs if len(pair)==2 ]:
+        if prof_proctor_days.get(p1, set()) != prof_proctor_days.get(p2, set()):
+            strict_errors.append(f"🔴 فك ارتباط: الأستاذان [{p1}] و [{p2}] يجب أن يتشاركا في جميع أيام حراستهما.")
+
+    for p1, p2 in [ (str(pair[0]).strip(), str(pair[1]).strip()) for pair in exclusive_profs if len(pair)==2 ]:
+        if not prof_proctor_days.get(p1, set()).isdisjoint(prof_proctor_days.get(p2, set())):
+            strict_errors.append(f"🔴 تنافر ممنوع: الأستاذان [{p1}] و [{p2}] لا يجب أن يجتمعا في نفس اليوم.")
+
+    # 5. القيود المرنة (كفاءة الحضور وتشتت المواد)
+    for prof, sub_days in prof_subject_days.items():
+        p_name = prof.strip()
+        p_days = prof_proctor_days.get(p_name, set())
+        
+        # كفاءة الحضور
+        for s_day in sub_days:
+            if s_day not in p_days:
+                soft_warnings.append(f"🟠 كفاءة الحضور (-10 نقاط): الأستاذ [{p_name}] لديه امتحان مادة يوم {s_day} ولكنه لا يحرس فيه.")
+        
+        # تشتت المواد (أكثر من يومين)
+        if len(sub_days) > 2:
+            extra = len(sub_days) - 2
+            soft_warnings.append(f"🟠 تشتت المواد (-{extra * 5} نقاط): مواد الأستاذ [{p_name}] موزعة على {len(sub_days)} أيام.")
+
+    return {"strict": strict_errors, "soft": soft_warnings}
+
+
+# ===================================================================
+# 11. دالة الطوارئ لسد النقص (Desperation Repair Pass)
+# ===================================================================
+def desperation_repair_pass(schedule, settings, all_professors, duty_patterns, date_map):
+    """
+    تتدخل هذه الدالة في نهاية التوليد للبحث عن أي 'نقص' متبقٍ.
+    تقوم بفرز الأساتذة (من الأقل عبئاً للأكثر) وتحاول سد النقص عبر 4 مستويات متدرجة.
+    """
+    import copy
+    from collections import defaultdict
+
+    repaired_schedule = copy.deepcopy(schedule)
+    
+    unavailable_days = settings.get('unavailableDays', {})
+    exclusive_profs = settings.get('exclusiveProfessors', [])
+    max_shifts = int(settings.get('maxShifts', '0')) if settings.get('maxShifts', '0') != '0' else float('inf')
+    max_large_hall_shifts = int(settings.get('maxLargeHallShifts', '2')) if settings.get('maxLargeHallShifts', '2') != '0' else float('inf')
+    guards_per_large_hall = int(settings.get('guardsLargeHall', 4))
+
+    # 1. إحصاء العبء الحالي لكل أستاذ في الجدول شبه النهائي
+    prof_assignments = defaultdict(list)
+    prof_large_counts = defaultdict(int)
+    
+    for day, slots in repaired_schedule.items():
+        for time_slot, exams in slots.items():
+            for exam in exams:
+                num_large_halls = len([h for h in exam.get('halls', []) if h.get('type') == 'كبيرة'])
+                large_slots_needed = num_large_halls * guards_per_large_hall
+                valid_guards = [g for g in exam.get('guards', []) if g != "**نقص**"]
+                
+                for idx, guard in enumerate(valid_guards):
+                    guard_clean = guard.strip()
+                    prof_assignments[guard_clean].append(exam)
+                    # 🌟 يُحسب كحارس قاعة كبيرة فقط إذا كان في المقاعد المخصصة لها
+                    if idx < large_slots_needed:
+                        prof_large_counts[guard_clean] += 1
+                            
+    def is_strictly_forbidden(prof, exam):
+        if any(e['date'] == exam['date'] and e['time'] == exam['time'] for e in prof_assignments.get(prof, [])): return True
+        if exam['date'] in unavailable_days.get(prof, []): return True
+        for pair in exclusive_profs:
+            if len(pair) == 2:
+                if prof == pair[0].strip() and any(e['date'] == exam['date'] for e in prof_assignments.get(pair[1].strip(), [])): return True
+                if prof == pair[1].strip() and any(e['date'] == exam['date'] for e in prof_assignments.get(pair[0].strip(), [])): return True
+        return False
+
+    def pattern_broken(prof, exam):
+        prof_pattern = duty_patterns.get(prof, 'flexible_2_days')
+        if prof_pattern == 'unlimited': return False
+        
+        duties_dates = {d['date'] for d in prof_assignments.get(prof, [])}
+        is_new_day = exam['date'] not in duties_dates
+        num_duty_days = len(duties_dates)
+        
+        if is_new_day:
+            if (prof_pattern == 'one_day_only' and num_duty_days >= 1) or \
+               (prof_pattern == 'flexible_2_days' and num_duty_days >= 2) or \
+               (prof_pattern == 'flexible_3_days' and num_duty_days >= 3) or \
+               (prof_pattern == 'consecutive_strict' and num_duty_days >= 2):
+                return True
+            elif prof_pattern == 'consecutive_strict' and num_duty_days == 1:
+                idx1 = date_map.get(list(duties_dates)[0])
+                idx2 = date_map.get(exam['date'])
+                if idx1 is None or idx2 is None or abs(idx1 - idx2) != 1: return True
+        return False
+
+    # 2. البحث عن النقص وسده بالتدرج
+    for day, slots in repaired_schedule.items():
+        for time_slot, exams in slots.items():
+            for exam in exams:
+                while "**نقص**" in exam.get('guards', []):
+                    num_large_halls = len([h for h in exam.get('halls', []) if h.get('type') == 'كبيرة'])
+                    large_slots_needed = num_large_halls * guards_per_large_hall
+                    current_guards_count = len([g for g in exam.get('guards', []) if g != "**نقص**"])
+                    
+                    # 🌟 هل هذا النقص يقع ضمن مقاعد القاعة الكبيرة؟
+                    is_large_hall_position = current_guards_count < large_slots_needed
+                    
+                    sorted_profs = sorted(all_professors, key=lambda p: len(prof_assignments.get(p.strip(), [])))
+                    assigned = False
+                    
+                    for level in range(4):
+                        for prof in sorted_profs:
+                            prof_clean = prof.strip()
+                            if is_strictly_forbidden(prof_clean, exam): continue
+                            
+                            shifts = len(prof_assignments.get(prof_clean, []))
+                            large_shifts = prof_large_counts.get(prof_clean, 0)
+                            
+                            if level == 0:
+                                if shifts >= max_shifts: continue
+                                if is_large_hall_position and large_shifts >= max_large_hall_shifts: continue
+                                if pattern_broken(prof_clean, exam): continue
+                            elif level == 1:
+                                if shifts >= max_shifts: continue
+                                if pattern_broken(prof_clean, exam): continue
+                            elif level == 2:
+                                if pattern_broken(prof_clean, exam): continue
+                            elif level == 3:
+                                pass
+                            
+                            exam['guards'].remove("**نقص**")
+                            exam['guards'].append(prof_clean)
+                            prof_assignments[prof_clean].append(exam)
+                            if is_large_hall_position:
+                                prof_large_counts[prof_clean] += 1
+                            assigned = True
+                            break 
+                        
+                        if assigned: break 
+                    if not assigned: break 
+                    
+    return repaired_schedule

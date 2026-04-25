@@ -78,11 +78,12 @@ function renderProfConstraintsTable(settings) {
             <tr data-prof-id="${p.id}" data-prof-name="${p.name}">
                 <td style="padding:10px; border-bottom:1px solid #eee; font-weight:bold;">${p.name}</td>
                 <td style="padding:10px; border-bottom:1px solid #eee;">
-                    <select class="pattern-select" style="padding:5px; border-radius:4px; font-size:13px;">
+                    <select class="pattern-select" style="padding:5px; border-radius:4px; font-size:13px; font-weight:bold;">
                         <option value="one_day_only" ${pattern==='one_day_only'?'selected':''}>يوم واحد فقط</option>
                         <option value="flexible_2_days" ${pattern==='flexible_2_days'?'selected':''}>مرن (يومان)</option>
                         <option value="consecutive_strict" ${pattern==='consecutive_strict'?'selected':''}>يومان متتاليان (إلزامي)</option>
                         <option value="flexible_3_days" ${pattern==='flexible_3_days'?'selected':''}>مرن (2 أو 3 أيام)</option>
+                        <option value="unlimited" ${pattern==='unlimited'?'selected':''} style="color: #28a745;">غير محدد (بدون قيود)</option>
                     </select>
                 </td>
                 <td style="padding:10px; border-bottom:1px solid #eee;">${datesHtml}</td>
